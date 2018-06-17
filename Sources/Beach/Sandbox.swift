@@ -9,15 +9,22 @@ import Dispatch
 import Foundation
 import XCTest
 
-protocol Beach {
-    typealias Configuration = (_ proc: Process) -> ()
-    associatedtype Places: RawRepresentable where Places.RawValue == String
-    var location: String { get }
-    var executable: String { get }
-    func configure(process: Process)
+protocol RunnerConfig {
+    associatedtype Sandboxes: RawRepresentable where Sandboxes.RawValue == String
+    
+    static var sandboxLocation: String { get }
+    static var executable: String { get }
+    
+    static func configure(process: Process)
 }
 
-struct BeachResult {
+extension RunnerConfig {
+    static var sandboxLocation: String { return "Tests/Sandboxes" }
+    
+    static func configure(process: Process) {}
+}
+
+struct RunnerResult {
     let exitStatus: Int32
     let stdoutData: Data
     let stderrData: Data
@@ -37,30 +44,27 @@ struct BeachResult {
     }
 }
 
-extension Beach {
+class Runner<Config: RunnerConfig> {
     
-    // Defaults
+    typealias ProcessConfiguration = (Process) -> ()
     
-    var location: String {
-        return "Tests/Sandboxes"
-    }
+    let boxPath = "/tmp/Beach"
     
-    func configure(process: Process) {}
-    
-    // Built-ins
-    
-    func run(arguments: [String], in box: Places? = nil, configure singleConfig: Configuration? = nil, timeout: Int? = nil, file: StaticString = #file, line: UInt = #line) -> BeachResult {
-        let boxPath = "/tmp/Beach"
+    init(sandbox: Config.Sandboxes?) {
         if FileManager.default.fileExists(atPath: boxPath) {
             try! FileManager.default.removeItem(atPath: boxPath)
         }
         
-        if let box = box {
-            try! FileManager.default.copyItem(atPath: location + box.rawValue, toPath: boxPath)
+        if let sandbox = sandbox {
+            try! FileManager.default.copyItem(atPath: Config.sandboxLocation + "/" + sandbox.rawValue, toPath: boxPath)
         } else {
             try! FileManager.default.createDirectory(atPath: boxPath, withIntermediateDirectories: true, attributes: nil)
         }
-        
+    }
+    
+    // Built-ins
+    
+    func run(arguments: [String], configure: ProcessConfiguration? = nil, timeout: Int? = nil, file: StaticString = #file, line: UInt = #line) -> RunnerResult {
         let out = Pipe()
         let err = Pipe()
         
@@ -69,8 +73,9 @@ extension Beach {
         process.currentDirectoryPath = boxPath
         process.standardOutput = out
         process.standardError = err
-        configure(process: process)
-        singleConfig?(process)
+
+        Config.configure(process: process)
+        configure?(process)
         
         process.launch()
         
@@ -91,21 +96,21 @@ extension Beach {
         let stdout = out.fileHandleForReading.readDataToEndOfFile()
         let stderr = err.fileHandleForReading.readDataToEndOfFile()
         
-        return BeachResult(exitStatus: process.terminationStatus, stdoutData: stdout, stderrData: stderr)
+        return RunnerResult(exitStatus: process.terminationStatus, stdoutData: stdout, stderrData: stderr)
     }
     
 }
 
-class IceRink: Beach {
+class IceConfig: RunnerConfig {
     
-    enum Places: String {
+    enum Sandboxes: String {
         case exec
         case lib
     }
     
-    let executable = "ice"
+    static let executable = "ice"
     
-    func configure(process: Process) {
+    static func configure(process: Process) {
         var env = ProcessInfo.processInfo.environment
         env["ICE_GLOBAL_ROOT"] = "global"
         process.environment = env
@@ -113,10 +118,12 @@ class IceRink: Beach {
     
 }
 
+typealias IceRunner = Runner<IceConfig>
+
 func run() {
-    let rink = IceRink()
+    let runner = IceRunner(sandbox: .exec)
     
-    let result = rink.run(arguments: [], in: .lib)
+    let result = runner.run(arguments: [])
     assert(result.exitStatus == 0)
     assert(result.stdout == "hello")
 }
