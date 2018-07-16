@@ -10,32 +10,34 @@ import Foundation
 import PathKit
 import XCTest
 
-protocol IceboxConfig {
+public protocol IceboxConfig {
     associatedtype Templates: RawRepresentable where Templates.RawValue == String
     
     static var templateLocation: Path { get }
     static var executable: String { get }
+    static var cleanUp: Bool { get }
     
     static func configure(process: Process)
 }
 
-extension IceboxConfig {
+public extension IceboxConfig {
     static var templateLocation: Path { return Path.current + "Tests" + "Templates" }
+    static var cleanUp: Bool { return false }
     
     static func configure(process: Process) {}
 }
 
-struct RunnerResult {
+public struct RunResult {
     
-    let exitStatus: Int32
-    let stdoutData: Data
-    let stderrData: Data
+    public let exitStatus: Int32
+    public let stdoutData: Data
+    public let stderrData: Data
     
-    var stdout: String? {
+    public var stdout: String? {
         return String(data: stdoutData, encoding: .utf8)
     }
     
-    var stderr: String? {
+    public var stderr: String? {
         return String(data: stderrData, encoding: .utf8)
     }
     
@@ -45,26 +47,26 @@ struct RunnerResult {
         self.stderrData = stderrData
     }
     
-    func assertStdout(_ test: (LineTester) -> ()) {
+    public func assertStdout(_ test: (LineTester) -> ()) {
         let tester = LineTester(content: stdout ?? "")
         test(tester)
     }
     
-    func assertStderr(_ test: (LineTester) -> ()) {
+    public func assertStderr(_ test: (LineTester) -> ()) {
         let tester = LineTester(content: stderr ?? "")
         test(tester)
     }
     
 }
 
-class Icebox<Config: IceboxConfig> {
+public class Icebox<Config: IceboxConfig> {
     
-    typealias ProcessConfiguration = (Process) -> ()
+    public typealias ProcessConfiguration = (Process) -> ()
     
     private let boxPath: Path
     private var currentProcess: Process?
     
-    init(template: Config.Templates?, file: StaticString = #file, function: StaticString = #function) {
+    public init(template: Config.Templates?, file: StaticString = #file, function: StaticString = #function) {
         let fileComps = Path(file.description).components
         let target = fileComps.index(of: "Tests").flatMap { fileComps[$0 + 1] } ?? "UnknownTarget"
         let file = Path(file.description).lastComponentWithoutExtension
@@ -100,7 +102,7 @@ class Icebox<Config: IceboxConfig> {
     
     // Set up
     
-    func createFile(path: Path, contents: String) {
+    public func createFile(path: Path, contents: String) {
         let adjustedPath = createPath(path)
         if !adjustedPath.parent().exists {
             try! adjustedPath.parent().mkpath()
@@ -108,23 +110,23 @@ class Icebox<Config: IceboxConfig> {
         try! createPath(path).write(contents)
     }
     
-    func createDirectory(path: Path) {
+    public func createDirectory(path: Path) {
         try! createPath(path).mkpath()
     }
     
-    func removeItem(_ path: Path) {
+    public func removeItem(_ path: Path) {
         try! createPath(path).delete()
     }
     
-    func fileContents(_ path: Path) -> String? {
+    public func fileContents(_ path: Path) -> String? {
         return try? createPath(path).read()
     }
     
-    func fileContents(_ path: Path) -> Data? {
+    public func fileContents(_ path: Path) -> Data? {
         return try? createPath(path).read()
     }
     
-    func fileExists(_ path: Path) -> Bool {
+    public func fileExists(_ path: Path) -> Bool {
         return createPath(path).exists
     }
     
@@ -142,12 +144,12 @@ class Icebox<Config: IceboxConfig> {
     // Run
     
     @discardableResult
-    func run(_ arguments: String..., configure: ProcessConfiguration? = nil, timeout: Int? = nil, file: StaticString = #file, line: UInt = #line) -> RunnerResult {
+    public func run(_ arguments: String..., configure: ProcessConfiguration? = nil, timeout: Int? = nil, file: StaticString = #file, line: UInt = #line) -> RunResult {
         return run(arguments: arguments, configure: configure, timeout: timeout, file: file, line: line)
     }
     
     @discardableResult
-    func run(arguments: [String], configure: ProcessConfiguration? = nil, timeout: Int? = nil, file: StaticString = #file, line: UInt = #line) -> RunnerResult {
+    public func run(arguments: [String], configure: ProcessConfiguration? = nil, timeout: Int? = nil, file: StaticString = #file, line: UInt = #line) -> RunResult {
         let out = Pipe()
         let err = Pipe()
         
@@ -179,19 +181,27 @@ class Icebox<Config: IceboxConfig> {
         let outCollector = DataCollector(handle: out.fileHandleForReading)
         let errCollector = DataCollector(handle: err.fileHandleForReading)
         
-        // Finish
-        
         let stdout = outCollector.read()
         let stderr = errCollector.read()
         process.waitUntilExit()
         interruptItem?.cancel()
         currentProcess = nil
         
-        return RunnerResult(exitStatus: process.terminationStatus, stdoutData: stdout, stderrData: stderr)
+        if Config.cleanUp {
+            cleanUp()
+        }
+        
+        return RunResult(exitStatus: process.terminationStatus, stdoutData: stdout, stderrData: stderr)
     }
     
-    func interrupt() {
+    public func interrupt() {
         currentProcess?.interrupt()
+    }
+    
+    // Clean up
+    
+    public func cleanUp() {
+        try! boxPath.delete()
     }
     
 }
@@ -225,20 +235,20 @@ private class DataCollector {
     
 }
 
-class LineTester {
+public class LineTester {
     
-    var lines: [String]
+    private var lines: [String]
     
-    init(content: String) {
+    public init(content: String) {
         self.lines = content.components(separatedBy: "\n")
     }
     
-    func equals(_ str: String, file: StaticString = #file, line: UInt = #line) {
+    public func equals(_ str: String, file: StaticString = #file, line: UInt = #line) {
         guard let first = removeFirst(file: file, line: line) else { return }
         XCTAssertEqual(first, str, file: file, line: line)
     }
     
-    func matches(_ str: StaticString, file: StaticString = #file, line: UInt = #line) {
+    public func matches(_ str: StaticString, file: StaticString = #file, line: UInt = #line) {
         guard let first = removeFirst(file: file, line: line) else { return }
         let regex = try! NSRegularExpression(pattern: str.description, options: [])
         
@@ -246,15 +256,15 @@ class LineTester {
         XCTAssertTrue(match != nil, "`\(first)` should match \(regex.pattern)", file: file, line: line)
     }
     
-    func empty(file: StaticString = #file, line: UInt = #line) {
+    public func empty(file: StaticString = #file, line: UInt = #line) {
         equals("", file: file, line: line)
     }
     
-    func any(file: StaticString = #file, line: UInt = #line) {
+    public func any(file: StaticString = #file, line: UInt = #line) {
         _ = removeFirst(file: file, line: line)
     }
     
-    func done(file: StaticString = #file, line: UInt = #line) {
+    public func done(file: StaticString = #file, line: UInt = #line) {
         XCTAssertEqual(lines, [], file: file, line: line)
     }
     
