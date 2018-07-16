@@ -4,15 +4,15 @@
 import PackageDescription
 
 let package = Package(
-    name: "Beach",
+    name: "Icebox",
     products: [
-        .library(name: "Beach", targets: ["Beach"]),
+        .library(name: "Icebox", targets: ["Icebox"]),
     ],
     dependencies: [
         .package(url: "https://github.com/kylef/PathKit", from: "0.9.1"),
     ],
     targets: [
-        .target(name: "Beach", dependencies: ["PathKit"]),
-        .testTarget(name: "BeachTests", dependencies: ["Beach"]),
+        .target(name: "Icebox", dependencies: ["PathKit"]),
+        .testTarget(name: "IceboxTests", dependencies: ["Icebox"]),
     ]
 )

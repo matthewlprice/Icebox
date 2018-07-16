@@ -1,13 +1,13 @@
 import XCTest
-@testable import Beach
+@testable import Icebox
 
-final class BeachTests: XCTestCase {
+final class IceboxTests: XCTestCase {
     
     func testExample() throws {
-        let runner = IceRunner(sandbox: .simple)
+        let runner = IceSandbox(template: .simple)
         
         let result = runner.run(arguments: ["file.txt"], timeout: 4)
-        result.assertSuccess()
+        XCTAssertEqual(result.exitStatus, 0)
         XCTAssertEqual(result.stdout, "hello\n")
     }
 
@@ -16,9 +16,9 @@ final class BeachTests: XCTestCase {
     ]
 }
 
-class IceConfig: RunnerConfig {
+class IceConfig: SandboxConfig {
     
-    enum Sandboxes: String {
+    enum Templates: String {
         case simple
         case lib
     }
@@ -33,7 +33,7 @@ class IceConfig: RunnerConfig {
     
 }
 
-typealias IceRunner = Runner<IceConfig>
+typealias IceSandbox = Sandbox<IceConfig>
 
 //func run() {
 //

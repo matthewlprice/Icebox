@@ -1,6 +1,6 @@
 //
-//  Sandbox.swift
-//  Beach
+//  Icebox.swift
+//  Icebox
 //
 //  Created by Jake Heiser on 6/8/18.
 //
@@ -10,17 +10,17 @@ import Foundation
 import PathKit
 import XCTest
 
-protocol RunnerConfig {
-    associatedtype Sandboxes: RawRepresentable where Sandboxes.RawValue == String
+protocol IceboxConfig {
+    associatedtype Templates: RawRepresentable where Templates.RawValue == String
     
-    static var sandboxLocation: Path { get }
+    static var templateLocation: Path { get }
     static var executable: String { get }
     
     static func configure(process: Process)
 }
 
-extension RunnerConfig {
-    static var sandboxLocation: Path { return Path.current + "Tests" + "Sandboxes" }
+extension IceboxConfig {
+    static var templateLocation: Path { return Path.current + "Tests" + "Templates" }
     
     static func configure(process: Process) {}
 }
@@ -45,14 +45,6 @@ struct RunnerResult {
         self.stderrData = stderrData
     }
     
-    func assertSuccess(file: StaticString = #file, line: UInt = #line) {
-        XCTAssertEqual(exitStatus, 0, file: file, line: line)
-    }
-    
-    func assertFailed(code: Int32, file: StaticString = #file, line: UInt = #line) {
-        XCTAssertEqual(exitStatus, code, file: file, line: line)
-    }
-    
     func assertStdout(_ test: (LineTester) -> ()) {
         let tester = LineTester(content: stdout ?? "")
         test(tester)
@@ -65,37 +57,40 @@ struct RunnerResult {
     
 }
 
-class Runner<Config: RunnerConfig> {
+class Icebox<Config: IceboxConfig> {
     
     typealias ProcessConfiguration = (Process) -> ()
     
     private let boxPath: Path
     private var currentProcess: Process?
     
-    init(sandbox: Config.Sandboxes?, file: StaticString = #file, function: StaticString = #function) {
+    init(template: Config.Templates?, file: StaticString = #file, function: StaticString = #function) {
         let fileComps = Path(file.description).components
         let target = fileComps.index(of: "Tests").flatMap { fileComps[$0 + 1] } ?? "UnknownTarget"
+        let file = Path(file.description).lastComponentWithoutExtension
         
         let notAllowed = CharacterSet.alphanumerics.inverted
         let trimmedExec = Config.executable.trimmingCharacters(in: notAllowed).replacingOccurrences(of: "/", with: "_")
         let trimmedFunc = function.description.trimmingCharacters(in: notAllowed)
         
-        self.boxPath = Path("/tmp") + "\(trimmedExec)_sandbox" + target + trimmedFunc
+        self.boxPath = Path("/tmp") + "icebox" + trimmedExec + target + file + trimmedFunc
+        
+        print(" Icebox: \(boxPath)")
         
         do {
             if boxPath.exists {
                 try boxPath.delete()
             }
             
-            if let sandbox = sandbox, sandbox.rawValue.lowercased() != "empty" {
+            if let template = template, template.rawValue.lowercased() != "empty" {
                 try boxPath.parent().mkpath()
-                try (Config.sandboxLocation + sandbox.rawValue).copy(boxPath)
+                try (Config.templateLocation + template.rawValue).copy(boxPath)
             } else {
                 try boxPath.mkpath()
             }
         } catch let error {
             print()
-            print("Beach: failed to set up sandbox")
+            print("Icebox: failed to set up icebox directory")
             print()
             print("Error:", error)
             print()
@@ -106,6 +101,10 @@ class Runner<Config: RunnerConfig> {
     // Set up
     
     func createFile(path: Path, contents: String) {
+        let adjustedPath = createPath(path)
+        if !adjustedPath.parent().exists {
+            try! adjustedPath.parent().mkpath()
+        }
         try! createPath(path).write(contents)
     }
     
@@ -133,7 +132,7 @@ class Runner<Config: RunnerConfig> {
         let full = (boxPath + relative).absolute()
         guard full.string.hasPrefix(boxPath.string + "/") else {
             print()
-            print("Beach: attempted to modify file outside of sandbox")
+            print("Icebox: attempted to modify file outside of icebox directory")
             print()
             exit(1)
         }
@@ -142,10 +141,12 @@ class Runner<Config: RunnerConfig> {
     
     // Run
     
+    @discardableResult
     func run(_ arguments: String..., configure: ProcessConfiguration? = nil, timeout: Int? = nil, file: StaticString = #file, line: UInt = #line) -> RunnerResult {
         return run(arguments: arguments, configure: configure, timeout: timeout, file: file, line: line)
     }
     
+    @discardableResult
     func run(arguments: [String], configure: ProcessConfiguration? = nil, timeout: Int? = nil, file: StaticString = #file, line: UInt = #line) -> RunnerResult {
         let out = Pipe()
         let err = Pipe()
@@ -240,9 +241,9 @@ class LineTester {
     func matches(_ str: StaticString, file: StaticString = #file, line: UInt = #line) {
         guard let first = removeFirst(file: file, line: line) else { return }
         let regex = try! NSRegularExpression(pattern: str.description, options: [])
-        if regex.firstMatch(in: first, options: [], range: NSRange()) == nil {
-            XCTFail(file: file, line: line)
-        }
+        
+        let match = regex.firstMatch(in: first, options: [], range: NSRange(location: 0, length: first.utf16.count))
+        XCTAssertTrue(match != nil, "`\(first)` should match \(regex.pattern)", file: file, line: line)
     }
     
     func empty(file: StaticString = #file, line: UInt = #line) {
