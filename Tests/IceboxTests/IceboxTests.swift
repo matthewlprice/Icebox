@@ -1,22 +1,40 @@
+import Icebox
+import PathKit
 import XCTest
-@testable import Icebox
 
 final class IceboxTests: XCTestCase {
     
-    func testExample() throws {
-        let runner = IceSandbox(template: .simple)
-        
-        let result = runner.run(arguments: ["file.txt"], timeout: 4)
+    func testRun() throws {
+        let catbox = CatIcebox(template: .simple)
+        let result = catbox.run("file.txt")
         XCTAssertEqual(result.exitStatus, 0)
         XCTAssertEqual(result.stdout, "hello\n")
     }
+    
+    func testCreateFile() throws {
+        let file: Path = "myFile"
+        let contents = "hello there"
+        let catbox = CatIcebox(template: .simple)
+        
+        XCTAssertFalse(catbox.fileExists(file))
+        
+        catbox.createFile(path: file, contents: contents)
+        
+        let result = catbox.run(file.string)
+        
+        XCTAssertEqual(result.exitStatus, 0)
+        XCTAssertEqual(result.stdout, contents)
+        XCTAssertEqual(catbox.fileContents("myFile"), contents)
+        XCTAssertTrue(catbox.fileExists(file))
+    }
 
     static var allTests = [
-        ("testExample", testExample),
+        ("testRun", testRun),
+        ("testCreateFile", testCreateFile),
     ]
 }
 
-class IceConfig: SandboxConfig {
+class CatConfig: IceboxConfig {
     
     enum Templates: String {
         case simple
@@ -25,16 +43,6 @@ class IceConfig: SandboxConfig {
     
     static let executable = "/bin/cat"
     
-    static func configure(process: Process) {
-        var env = ProcessInfo.processInfo.environment
-        env["ICE_GLOBAL_ROOT"] = "global"
-        process.environment = env
-    }
-    
 }
 
-typealias IceSandbox = Sandbox<IceConfig>
-
-//func run() {
-//
-//}
+typealias CatIcebox = Icebox<CatConfig>

@@ -16,68 +16,54 @@ public protocol IceboxConfig {
     static var templateLocation: Path { get }
     static var executable: String { get }
     static var cleanUp: Bool { get }
+    static var printLocation: Bool { get }
     
     static func configure(process: Process)
 }
 
 public extension IceboxConfig {
-    static var templateLocation: Path { return Path.current + "Tests" + "Templates" }
+    static var templateLocation: Path { return Path("Tests") + "Templates" }
     static var cleanUp: Bool { return false }
+    static var printLocation: Bool { return true  }
     
     static func configure(process: Process) {}
-}
-
-public struct RunResult {
-    
-    public let exitStatus: Int32
-    public let stdoutData: Data
-    public let stderrData: Data
-    
-    public var stdout: String? {
-        return String(data: stdoutData, encoding: .utf8)
-    }
-    
-    public var stderr: String? {
-        return String(data: stderrData, encoding: .utf8)
-    }
-    
-    init(exitStatus: Int32, stdoutData: Data, stderrData: Data) {
-        self.exitStatus = exitStatus
-        self.stdoutData = stdoutData
-        self.stderrData = stderrData
-    }
-    
-    public func assertStdout(_ test: (LineTester) -> ()) {
-        let tester = LineTester(content: stdout ?? "")
-        test(tester)
-    }
-    
-    public func assertStderr(_ test: (LineTester) -> ()) {
-        let tester = LineTester(content: stderr ?? "")
-        test(tester)
-    }
-    
 }
 
 public class Icebox<Config: IceboxConfig> {
     
     public typealias ProcessConfiguration = (Process) -> ()
     
+    private let launchPath: String
     private let boxPath: Path
     private var currentProcess: Process?
     
     public init(template: Config.Templates?, file: StaticString = #file, function: StaticString = #function) {
         let fileComps = Path(file.description).components
-        let target = fileComps.index(of: "Tests").flatMap { fileComps[$0 + 1] } ?? "UnknownTarget"
+        
+        let folder: Path
+        if let index = fileComps.index(of: "Tests") {
+            folder = Path(components: fileComps.prefix(upTo: index))
+        } else {
+            folder = Path.current
+        }
+        
         let file = Path(file.description).lastComponentWithoutExtension
+        
+        if Config.executable.hasPrefix(Path.separator) {
+            self.launchPath = Config.executable
+        } else {
+            self.launchPath = (folder + ".build" + "debug" + Config.executable).absolute().string
+        }
         
         let notAllowed = CharacterSet.alphanumerics.inverted
         let trimmedExec = Config.executable.trimmingCharacters(in: notAllowed).replacingOccurrences(of: "/", with: "_")
         let trimmedFunc = function.description.trimmingCharacters(in: notAllowed)
         
-        self.boxPath = Path("/tmp") + "icebox" + trimmedExec + target + file + trimmedFunc
+        self.boxPath = Path("/tmp") + "icebox" + trimmedExec + file + trimmedFunc
         
-        print(" Icebox: \(boxPath)")
+        if Config.printLocation {
+            print("\(Colors.blue)Icebox: \(Colors.none)running in \(boxPath)")
+        }
         
         do {
             if boxPath.exists {
@@ -86,15 +72,15 @@ public class Icebox<Config: IceboxConfig> {
             
             if let template = template, template.rawValue.lowercased() != "empty" {
                 try boxPath.parent().mkpath()
-                try (Config.templateLocation + template.rawValue).copy(boxPath)
+                try (folder + Config.templateLocation + template.rawValue).copy(boxPath)
             } else {
                 try boxPath.mkpath()
             }
         } catch let error {
             print()
-            print("Icebox: failed to set up icebox directory")
+            print("\(Colors.red)Icebox error: \(Colors.none)failed to set up icebox directory")
             print()
-            print("Error:", error)
+            print(error)
             print()
             exit(1)
         }
@@ -102,43 +88,32 @@ public class Icebox<Config: IceboxConfig> {
     
     // Set up
     
-    public func createFile(path: Path, contents: String) {
-        let adjustedPath = createPath(path)
+    public func createFile(path: Path, contents: String, file: StaticString = #file, line: UInt = #line) {
+        let adjustedPath = adjustPath(path, file: file, line: line)
         if !adjustedPath.parent().exists {
-            try! adjustedPath.parent().mkpath()
+            gracefulTry(try adjustedPath.parent().mkpath())
         }
-        try! createPath(path).write(contents)
+        gracefulTry(try adjustedPath.write(contents))
     }
     
-    public func createDirectory(path: Path) {
-        try! createPath(path).mkpath()
+    public func createDirectory(path: Path, file: StaticString = #file, line: UInt = #line) {
+        gracefulTry(try adjustPath(path, file: file, line: line).mkpath())
     }
     
-    public func removeItem(_ path: Path) {
-        try! createPath(path).delete()
+    public func removeItem(_ path: Path, file: StaticString = #file, line: UInt = #line) {
+        gracefulTry(try adjustPath(path, file: file, line: line).delete())
     }
     
-    public func fileContents(_ path: Path) -> String? {
-        return try? createPath(path).read()
+    public func fileContents(_ path: Path, file: StaticString = #file, line: UInt = #line) -> String? {
+        return try? adjustPath(path, file: file, line: line).read()
     }
     
-    public func fileContents(_ path: Path) -> Data? {
-        return try? createPath(path).read()
+    public func fileContents(_ path: Path, file: StaticString = #file, line: UInt = #line) -> Data? {
+        return try? adjustPath(path, file: file, line: line).read()
     }
     
-    public func fileExists(_ path: Path) -> Bool {
-        return createPath(path).exists
-    }
-    
-    private func createPath(_ relative: Path) -> Path {
-        let full = (boxPath + relative).absolute()
-        guard full.string.hasPrefix(boxPath.string + "/") else {
-            print()
-            print("Icebox: attempted to modify file outside of icebox directory")
-            print()
-            exit(1)
-        }
-        return full
+    public func fileExists(_ path: Path, file: StaticString = #file, line: UInt = #line) -> Bool {
+        return adjustPath(path, file: file, line: line).exists
     }
     
     // Run
@@ -154,7 +129,11 @@ public class Icebox<Config: IceboxConfig> {
         let err = Pipe()
         
         let process = Process()
-        process.launchPath = (Path.current + ".build" + "debug" + Config.executable).absolute().string
+        if Config.executable.hasPrefix(Path.separator) {
+            process.launchPath = Config.executable
+        } else {
+            process.launchPath = (Path.current + ".build" + "debug" + Config.executable).absolute().string
+        }
         process.arguments = arguments
         process.currentDirectoryPath = boxPath.string
         process.standardOutput = out
@@ -166,16 +145,13 @@ public class Icebox<Config: IceboxConfig> {
         currentProcess = process
         process.launch()
         
-        // Timeout
-        
-        var interruptItem: DispatchWorkItem? = nil
-        if let timeout = timeout {
+        let interruptItem: DispatchWorkItem? = timeout.flatMap { (timeout) in
             let item = DispatchWorkItem {
                 XCTFail("Exceeded timeout (\(timeout) seconds), killing process", file: file, line: line)
                 process.terminate()
             }
             DispatchQueue.global().asyncAfter(deadline: .now() + .seconds(timeout), execute: item)
-            interruptItem = item
+            return item
         }
         
         let outCollector = DataCollector(handle: out.fileHandleForReading)
@@ -201,10 +177,38 @@ public class Icebox<Config: IceboxConfig> {
     // Clean up
     
     public func cleanUp() {
-        try! boxPath.delete()
+        gracefulTry(try boxPath.delete())
+    }
+    
+    // Helpers
+    
+    private func adjustPath(_ relative: Path, file: StaticString, line: UInt) -> Path {
+        let full = (boxPath + relative).absolute()
+        guard full.string.hasPrefix(boxPath.string + Path.separator) else {
+            print()
+            print("Icebox: attempted to modify file outside of icebox directory")
+            print()
+            print("Illegal path `\(full)` resulting from \(file):\(line)")
+            print()
+            exit(1)
+        }
+        return full
+    }
+    
+    private func gracefulTry(_ block: @autoclosure () throws -> ()) {
+        do {
+            try block()
+        } catch let error {
+            print()
+            print("\(Colors.red)Icebox error: \(Colors.none)\(error)")
+            print()
+            exit(1)
+        }
     }
     
 }
+
+// MARK: - Private
 
 private class DataCollector {
     
@@ -235,45 +239,9 @@ private class DataCollector {
     
 }
 
-public class LineTester {
-    
-    private var lines: [String]
-    
-    public init(content: String) {
-        self.lines = content.components(separatedBy: "\n")
-    }
-    
-    public func equals(_ str: String, file: StaticString = #file, line: UInt = #line) {
-        guard let first = removeFirst(file: file, line: line) else { return }
-        XCTAssertEqual(first, str, file: file, line: line)
-    }
-    
-    public func matches(_ str: StaticString, file: StaticString = #file, line: UInt = #line) {
-        guard let first = removeFirst(file: file, line: line) else { return }
-        let regex = try! NSRegularExpression(pattern: str.description, options: [])
-        
-        let match = regex.firstMatch(in: first, options: [], range: NSRange(location: 0, length: first.utf16.count))
-        XCTAssertTrue(match != nil, "`\(first)` should match \(regex.pattern)", file: file, line: line)
-    }
-    
-    public func empty(file: StaticString = #file, line: UInt = #line) {
-        equals("", file: file, line: line)
-    }
-    
-    public func any(file: StaticString = #file, line: UInt = #line) {
-        _ = removeFirst(file: file, line: line)
-    }
-    
-    public func done(file: StaticString = #file, line: UInt = #line) {
-        XCTAssertEqual(lines, [], file: file, line: line)
-    }
-    
-    private func removeFirst(file: StaticString, line: UInt) -> String? {
-        if lines.isEmpty {
-            XCTFail("No lines left", file: file, line: line)
-            return nil
-        }
-        return lines.removeFirst()
-    }
-    
+private struct Colors {
+    private static let escape = "\u{001B}["
+    static let none   = escape + "0m"
+    static let red    = escape + "0;31m"
+    static let blue = escape + "0;34m"
 }
