@@ -33,6 +33,11 @@ public class Icebox<Config: IceboxConfig> {
     
     public typealias ProcessConfiguration = (Process) -> ()
     
+    private static func terminate(_ message: String) -> Never {
+        Logger.error(message)
+        exit(1)
+    }
+    
     private let launchPath: String
     private let boxPath: Path
     private var currentProcess: Process?
@@ -55,6 +60,10 @@ public class Icebox<Config: IceboxConfig> {
             self.launchPath = (folder + ".build" + "debug" + Config.executable).absolute().string
         }
         
+        guard Path(self.launchPath).isExecutable else {
+            Icebox.terminate("launch path \(launchPath) not executable; ensure the executable exists at this path")
+        }
+        
         let notAllowed = CharacterSet.alphanumerics.inverted
         let trimmedExec = Config.executable.trimmingCharacters(in: notAllowed).replacingOccurrences(of: "/", with: "_")
         let trimmedFunc = function.description.trimmingCharacters(in: notAllowed)
@@ -62,7 +71,7 @@ public class Icebox<Config: IceboxConfig> {
         self.boxPath = Path("/tmp") + "icebox" + trimmedExec + file + trimmedFunc
         
         if Config.printLocation {
-            print("\(Colors.blue)Icebox: \(Colors.none)running in \(boxPath)")
+            Logger.info("running in \(boxPath)")
         }
         
         do {
@@ -77,12 +86,7 @@ public class Icebox<Config: IceboxConfig> {
                 try boxPath.mkpath()
             }
         } catch let error {
-            print()
-            print("\(Colors.red)Icebox error: \(Colors.none)failed to set up icebox directory")
-            print()
-            print(error)
-            print()
-            exit(1)
+            Icebox.terminate("failed to set up icebox; \(error)")
         }
     }
     
@@ -119,6 +123,20 @@ public class Icebox<Config: IceboxConfig> {
     // Run
     
     @discardableResult
+    public func runSuccess(_ arguments: String..., configure: ProcessConfiguration? = nil, timeout: Int? = nil, file: StaticString = #file, line: UInt = #line) -> RunResult {
+        let result = run(arguments: arguments, configure: configure, timeout: timeout, file: file, line: line)
+        XCTAssertEqual(result.exitStatus, 0, file: file, line: line)
+        return result
+    }
+    
+    @discardableResult
+    public func runFailure(_ arguments: String..., configure: ProcessConfiguration? = nil, timeout: Int? = nil, file: StaticString = #file, line: UInt = #line, expectedExitStatus: Int32) -> RunResult {
+        let result = run(arguments: arguments, configure: configure, timeout: timeout, file: file, line: line)
+        XCTAssertEqual(result.exitStatus, expectedExitStatus, file: file, line: line)
+        return result
+    }
+    
+    @discardableResult
     public func run(_ arguments: String..., configure: ProcessConfiguration? = nil, timeout: Int? = nil, file: StaticString = #file, line: UInt = #line) -> RunResult {
         return run(arguments: arguments, configure: configure, timeout: timeout, file: file, line: line)
     }
@@ -129,11 +147,7 @@ public class Icebox<Config: IceboxConfig> {
         let err = Pipe()
         
         let process = Process()
-        if Config.executable.hasPrefix(Path.separator) {
-            process.launchPath = Config.executable
-        } else {
-            process.launchPath = (Path.current + ".build" + "debug" + Config.executable).absolute().string
-        }
+        process.launchPath = launchPath
         process.arguments = arguments
         process.currentDirectoryPath = boxPath.string
         process.standardOutput = out
@@ -185,12 +199,7 @@ public class Icebox<Config: IceboxConfig> {
     private func adjustPath(_ relative: Path, file: StaticString, line: UInt) -> Path {
         let full = (boxPath + relative).absolute()
         guard full.string.hasPrefix(boxPath.string + Path.separator) else {
-            print()
-            print("Icebox: attempted to modify file outside of icebox directory")
-            print()
-            print("Illegal path `\(full)` resulting from \(file):\(line)")
-            print()
-            exit(1)
+            Icebox.terminate("attempted to modify file outside of icebox directory; illegal path `\(full)` resulting from \(file):\(line)")
         }
         return full
     }
@@ -199,10 +208,7 @@ public class Icebox<Config: IceboxConfig> {
         do {
             try block()
         } catch let error {
-            print()
-            print("\(Colors.red)Icebox error: \(Colors.none)\(error)")
-            print()
-            exit(1)
+            Icebox.terminate(String(describing: error))
         }
     }
     
@@ -237,11 +243,4 @@ private class DataCollector {
         return data
     }
     
-}
-
-private struct Colors {
-    private static let escape = "\u{001B}["
-    static let none   = escape + "0m"
-    static let red    = escape + "0;31m"
-    static let blue = escape + "0;34m"
 }
