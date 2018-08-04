@@ -162,7 +162,11 @@ public class Icebox<Config: IceboxConfig> {
         let interruptItem: DispatchWorkItem? = timeout.flatMap { (timeout) in
             let item = DispatchWorkItem {
                 XCTFail("Exceeded timeout (\(timeout) seconds), killing process", file: file, line: line)
+                #if os(Linux)
+                kill(process.processIdentifier, SIGKILL)
+                #else
                 process.terminate()
+                #endif
             }
             DispatchQueue.global().asyncAfter(deadline: .now() + .seconds(timeout), execute: item)
             return item
@@ -218,24 +222,21 @@ public class Icebox<Config: IceboxConfig> {
 
 private class DataCollector {
     
-    let source: DispatchSourceRead
-    
     private var data = Data()
+    private let queue = DispatchQueue(label: "Icebox.DataCollector")
     private let finished = DispatchSemaphore(value: 0)
     
     init(handle: FileHandle) {
-        let source = DispatchSource.makeReadSource(fileDescriptor: handle.fileDescriptor)
-        self.source = source
-        source.setEventHandler {
-            let chunk = handle.availableData
-            if chunk.isEmpty {
-                source.cancel()
-                self.finished.signal()
-            } else {
+        queue.async {
+            while true {
+                let chunk = handle.availableData
+                if chunk.isEmpty {
+                    self.finished.signal()
+                    return
+                }
                 self.data += chunk
             }
         }
-        source.resume()
     }
     
     func read() -> Data {

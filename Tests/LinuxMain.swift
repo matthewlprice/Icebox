@@ -1,6 +1,6 @@
 import XCTest
 
-import BeachTests
+import IceboxTests
 
 var tests = [XCTestCaseEntry]()
 tests += IceboxTests.allTests()

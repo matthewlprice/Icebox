@@ -6,7 +6,7 @@ final class IceboxTests: XCTestCase {
     
     func testRun() throws {
         let catbox = CatIcebox(template: .simple)
-        let result = catbox.run("file.txt")
+        let result = catbox.run("file.txt", timeout: 2)
         XCTAssertEqual(result.exitStatus, 0)
         XCTAssertEqual(result.stdout, "hello\n")
     }
