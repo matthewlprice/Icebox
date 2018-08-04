@@ -39,6 +39,7 @@ final class IceboxTests: XCTestCase {
     static var allTests = [
         ("testRun", testRun),
         ("testCreateFile", testCreateFile),
+        ("testInside", testInside),
     ]
 }
 

@@ -45,19 +45,30 @@ public class Icebox<Config: IceboxConfig> {
     public init(template: Config.Templates?, file: StaticString = #file, function: StaticString = #function) {
         let fileComps = Path(file.description).components
         
-        let folder: Path
+        let templateFolder: Path
         if let index = fileComps.index(of: "Tests") {
-            folder = Path(components: fileComps.prefix(upTo: index))
+            templateFolder = Path(components: fileComps.prefix(upTo: index))
         } else {
-            folder = Path.current
+            templateFolder = Path.current
         }
+        
+        let executableFolder: Path
+        #if os(macOS)
+        if let bundle = Bundle.allBundles.first(where: { $0.bundlePath.hasSuffix(".xctest") }) {
+            executableFolder = Path(bundle.bundlePath).parent()
+        } else {
+            executableFolder = templateFolder + ".build" + "debug"
+        }
+        #else
+        executableFolder = templateFolder + ".build" + "debug"
+        #endif
         
         let file = Path(file.description).lastComponentWithoutExtension
         
         if Config.executable.hasPrefix(Path.separator) {
             self.launchPath = Config.executable
         } else {
-            self.launchPath = (folder + ".build" + "debug" + Config.executable).absolute().string
+            self.launchPath = (executableFolder + Config.executable).absolute().string
         }
         
         guard Path(self.launchPath).isExecutable else {
@@ -81,7 +92,7 @@ public class Icebox<Config: IceboxConfig> {
             
             if let template = template, template.rawValue.lowercased() != "empty" {
                 try boxPath.parent().mkpath()
-                try (folder + Config.templateLocation + template.rawValue).copy(boxPath)
+                try (templateFolder + Config.templateLocation + template.rawValue).copy(boxPath)
             } else {
                 try boxPath.mkpath()
             }
