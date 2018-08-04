@@ -92,7 +92,15 @@ public class Icebox<Config: IceboxConfig> {
             
             if let template = template, template.rawValue.lowercased() != "empty" {
                 try boxPath.parent().mkpath()
-                try (templateFolder + Config.templateLocation + template.rawValue).copy(boxPath)
+                
+                let process = Process()
+                process.launchPath = "/bin/cp"
+                process.arguments = ["-r", (templateFolder + Config.templateLocation + template.rawValue).string, boxPath.string]
+                process.launch()
+                process.waitUntilExit()
+                guard process.terminationStatus == 0 else {
+                    Icebox.terminate("failed to copy template to icebox")
+                }
             } else {
                 try boxPath.mkpath()
             }
