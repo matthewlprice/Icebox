@@ -27,7 +27,7 @@ final class IceboxTests: XCTestCase {
         XCTAssertEqual(catbox.fileContents("myFile"), contents)
         XCTAssertTrue(catbox.fileExists(file))
     }
-
+    
     static var allTests = [
         ("testRun", testRun),
         ("testCreateFile", testCreateFile),

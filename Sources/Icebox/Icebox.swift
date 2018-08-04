@@ -90,6 +90,12 @@ public class Icebox<Config: IceboxConfig> {
         }
     }
     
+    deinit {
+        if Config.cleanUp {
+            cleanUp()
+        }
+    }
+    
     // Set up
     
     public func createFile(path: Path, contents: String, file: StaticString = #file, line: UInt = #line) {
@@ -181,11 +187,17 @@ public class Icebox<Config: IceboxConfig> {
         interruptItem?.cancel()
         currentProcess = nil
         
-        if Config.cleanUp {
-            cleanUp()
-        }
-        
         return RunResult(exitStatus: process.terminationStatus, stdoutData: stdout, stderrData: stderr)
+    }
+    
+    public func execute(_ arguments: String...) {
+        let process = Process()
+        process.launchPath = "/usr/bin/env"
+        process.arguments = arguments
+        process.currentDirectoryPath = boxPath.string
+        currentProcess = process
+        process.launch()
+        process.waitUntilExit()
     }
     
     public func interrupt() {
