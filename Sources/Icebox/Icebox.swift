@@ -200,6 +200,12 @@ public class Icebox<Config: IceboxConfig> {
         process.waitUntilExit()
     }
     
+    public func inside(_ block: () throws -> ()) {
+        gracefulTry(try boxPath.chdir {
+            try block()
+        })
+    }
+    
     public func interrupt() {
         currentProcess?.interrupt()
     }

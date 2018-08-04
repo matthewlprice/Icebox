@@ -28,6 +28,14 @@ final class IceboxTests: XCTestCase {
         XCTAssertTrue(catbox.fileExists(file))
     }
     
+    func testInside() {
+        let catbox = CatIcebox(template: .simple)
+        
+        catbox.inside {
+            XCTAssertEqual(try? Path("file.txt").read(), "hello\n")
+        }
+    }
+    
     static var allTests = [
         ("testRun", testRun),
         ("testCreateFile", testCreateFile),
