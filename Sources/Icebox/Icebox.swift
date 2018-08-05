@@ -209,14 +209,28 @@ public class Icebox<Config: IceboxConfig> {
         return RunResult(exitStatus: process.terminationStatus, stdoutData: stdout, stderrData: stderr)
     }
     
-    public func execute(_ arguments: String...) {
+    @discardableResult
+    public func execute(with arguments: String...) -> Int32 {
         let process = Process()
-        process.launchPath = "/usr/bin/env"
+        process.launchPath = launchPath
         process.arguments = arguments
         process.currentDirectoryPath = boxPath.string
         currentProcess = process
         process.launch()
         process.waitUntilExit()
+        return process.terminationStatus
+    }
+    
+    @discardableResult
+    public func executeExternal(executable: String, arguments: String...) -> Int32 {
+        let process = Process()
+        process.launchPath = "/usr/bin/env"
+        process.arguments = [executable] + arguments
+        process.currentDirectoryPath = boxPath.string
+        currentProcess = process
+        process.launch()
+        process.waitUntilExit()
+        return process.terminationStatus
     }
     
     public func inside(_ block: () throws -> ()) {
