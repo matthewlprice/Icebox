@@ -45,11 +45,11 @@ public class Icebox<Config: IceboxConfig> {
     public init(template: Config.Templates?, file: StaticString = #file, function: StaticString = #function) {
         let fileComps = Path(file.description).components
         
-        let templateFolder: Path
+        let sourceFolder: Path
         if let index = fileComps.index(of: "Tests") {
-            templateFolder = Path(components: fileComps.prefix(upTo: index))
+            sourceFolder = Path(components: fileComps.prefix(upTo: index))
         } else {
-            templateFolder = Path.current
+            sourceFolder = Path.current
         }
         
         let executableFolder: Path
@@ -57,10 +57,10 @@ public class Icebox<Config: IceboxConfig> {
         if let bundle = Bundle.allBundles.first(where: { $0.bundlePath.hasSuffix(".xctest") }) {
             executableFolder = Path(bundle.bundlePath).parent()
         } else {
-            executableFolder = templateFolder + ".build" + "debug"
+            executableFolder = sourceFolder + ".build" + "debug"
         }
         #else
-        executableFolder = templateFolder + ".build" + "debug"
+        executableFolder = sourceFolder + ".build" + "debug"
         #endif
         
         let file = Path(file.description).lastComponentWithoutExtension
@@ -93,9 +93,22 @@ public class Icebox<Config: IceboxConfig> {
             if let template = template, template.rawValue.lowercased() != "empty" {
                 try boxPath.parent().mkpath()
                 
+                let templateFolder = sourceFolder + Config.templateLocation
+                
+                let templatePath: Path
+                let asIs = templateFolder + template.rawValue
+                let capitalized = templateFolder + template.rawValue.capitalized
+                if asIs.exists {
+                    templatePath = asIs
+                } else if capitalized.exists {
+                    templatePath = capitalized
+                } else {
+                    Icebox.terminate("template does not exist: \(asIs)")
+                }
+                
                 let process = Process()
                 process.launchPath = "/bin/cp"
-                process.arguments = ["-r", (templateFolder + Config.templateLocation + template.rawValue).string, boxPath.string]
+                process.arguments = ["-r", templatePath.string, boxPath.string]
                 process.launch()
                 process.waitUntilExit()
                 guard process.terminationStatus == 0 else {
