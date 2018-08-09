@@ -37,6 +37,19 @@ public class LineTester {
         _ = removeFirst(file: file, line: line)
     }
     
+    public func equalsInAnyOrder(_ lines: Set<String>, file: StaticString = #file, line: UInt = #line) {
+        var lines = lines
+        while !lines.isEmpty {
+            guard let first = removeFirst(file: file, line: line) else { return }
+            if lines.contains(first) {
+                lines.remove(first)
+            } else {
+                XCTFail("Unexpected line: \(first)", file: file, line: line)
+                break
+            }
+        }
+    }
+    
     public func done(file: StaticString = #file, line: UInt = #line) {
         XCTAssertEqual(lines, [], file: file, line: line)
     }
