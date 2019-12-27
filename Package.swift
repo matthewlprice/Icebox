@@ -9,7 +9,7 @@ let package = Package(
         .library(name: "Icebox", targets: ["Icebox"]),
     ],
     dependencies: [
-        .package(url: "https://github.com/kylef/PathKit", from: "0.9.1"),
+        .package(url: "https://github.com/kylef/PathKit", from: "1.0.0"),
     ],
     targets: [
         .target(name: "Icebox", dependencies: ["PathKit"]),
