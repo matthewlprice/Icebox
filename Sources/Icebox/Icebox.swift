@@ -162,14 +162,14 @@ public class Icebox<Config: IceboxConfig> {
     
     @discardableResult
     public func runSuccess(_ arguments: String..., configure: ProcessConfiguration? = nil, timeout: Int? = nil, file: StaticString = #file, line: UInt = #line) -> RunResult {
-        let result = run(arguments: arguments, configure: configure, timeout: timeout, file: file, line: line)
+        let result = run(arguments: arguments, configure: configure, timeout: timeout, file: #file, line: line)
         XCTAssertEqual(result.exitStatus, 0)
         return result
     }
     
     @discardableResult
     public func runFailure(_ arguments: String..., configure: ProcessConfiguration? = nil, timeout: Int? = nil, file: StaticString = #file, line: UInt = #line, expectedExitStatus: Int32) -> RunResult {
-        let result = run(arguments: arguments, configure: configure, timeout: timeout, file: file, line: line)
+        let result = run(arguments: arguments, configure: configure, timeout: timeout, file: #file, line: line)
         XCTAssertEqual(result.exitStatus, expectedExitStatus)
         return result
     }
@@ -199,7 +199,7 @@ public class Icebox<Config: IceboxConfig> {
         
         let interruptItem: DispatchWorkItem? = timeout.flatMap { (timeout) in
             let item = DispatchWorkItem {
-                XCTFail("Exceeded timeout (\(timeout) seconds), killing process", file: file, line: line)
+                XCTFail("Exceeded timeout (\(timeout) seconds), killing process", file: #file, line: line)
                 #if os(Linux)
                 kill(process.processIdentifier, SIGKILL)
                 #else

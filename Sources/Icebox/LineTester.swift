@@ -18,7 +18,7 @@ public class LineTester {
     
     public func equals(_ str: String, file: StaticString = #file, line: UInt = #line) {
         guard let first = removeFirst(file: file, line: line) else { return }
-        XCTAssertEqual(first, str, file: file, line: line)
+        XCTAssertEqual(first, str, file: #file, line: line)
     }
     
     public func matches(_ str: StaticString, file: StaticString = #file, line: UInt = #line) {
@@ -26,7 +26,7 @@ public class LineTester {
         let regex = try! NSRegularExpression(pattern: str.description, options: [])
         
         let match = regex.firstMatch(in: first, options: [], range: NSRange(location: 0, length: first.utf16.count))
-        XCTAssertTrue(match != nil, "`\(first)` should match \(regex.pattern)", file: file, line: line)
+        XCTAssertTrue(match != nil, "`\(first)` should match \(regex.pattern)", file: #file, line: line)
     }
     
     public func empty(file: StaticString = #file, line: UInt = #line) {
@@ -44,14 +44,14 @@ public class LineTester {
             if lines.contains(first) {
                 lines.remove(first)
             } else {
-                XCTFail("Unexpected line: \(first)", file: file, line: line)
+                XCTFail("Unexpected line: \(first)", file: #file, line: line)
                 break
             }
         }
     }
     
     public func done(file: StaticString = #file, line: UInt = #line) {
-        XCTAssertEqual(lines, [], file: file, line: line)
+        XCTAssertEqual(lines, [], file: #file, line: line)
     }
     
     private func removeFirst(file: StaticString, line: UInt) -> String? {
