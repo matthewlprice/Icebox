@@ -139,23 +139,23 @@ public class Icebox<Config: IceboxConfig> {
     }
     
     public func createDirectory(path: Path, file: StaticString = #file, line: UInt = #line) {
-        gracefulTry(try adjustPath(path, file: file, line: line).mkpath())
+        gracefulTry(try adjustPath(path, file: (file), line: line).mkpath())
     }
     
     public func removeItem(_ path: Path, file: StaticString = #file, line: UInt = #line) {
-        gracefulTry(try adjustPath(path, file: file, line: line).delete())
+        gracefulTry(try adjustPath(path, file: (file), line: line).delete())
     }
     
     public func fileContents(_ path: Path, file: StaticString = #file, line: UInt = #line) -> String? {
-        return try? adjustPath(path, file: file, line: line).read()
+        return try? adjustPath(path, file: (file), line: line).read()
     }
     
     public func fileContents(_ path: Path, file: StaticString = #file, line: UInt = #line) -> Data? {
-        return try? adjustPath(path, file: file, line: line).read()
+        return try? adjustPath(path, file: (file), line: line).read()
     }
     
     public func fileExists(_ path: Path, file: StaticString = #file, line: UInt = #line) -> Bool {
-        return adjustPath(path, file: file, line: line).exists
+        return adjustPath(path, file: (file), line: line).exists
     }
     
     // Run
@@ -163,20 +163,20 @@ public class Icebox<Config: IceboxConfig> {
     @discardableResult
     public func runSuccess(_ arguments: String..., configure: ProcessConfiguration? = nil, timeout: Int? = nil, file: StaticString = #file, line: UInt = #line) -> RunResult {
         let result = run(arguments: arguments, configure: configure, timeout: timeout, file: file, line: line)
-        XCTAssertEqual(result.exitStatus, 0, file: file, line: line)
+        XCTAssertEqual(result.exitStatus, 0, file: (file), line: line)
         return result
     }
     
     @discardableResult
     public func runFailure(_ arguments: String..., configure: ProcessConfiguration? = nil, timeout: Int? = nil, file: StaticString = #file, line: UInt = #line, expectedExitStatus: Int32) -> RunResult {
-        let result = run(arguments: arguments, configure: configure, timeout: timeout, file: file, line: line)
-        XCTAssertEqual(result.exitStatus, expectedExitStatus, file: file, line: line)
+        let result = run(arguments: arguments, configure: configure, timeout: timeout, file: (file), line: line)
+        XCTAssertEqual(result.exitStatus, expectedExitStatus, file: (file), line: line)
         return result
     }
     
     @discardableResult
     public func run(_ arguments: String..., configure: ProcessConfiguration? = nil, timeout: Int? = nil, file: StaticString = #file, line: UInt = #line) -> RunResult {
-        return run(arguments: arguments, configure: configure, timeout: timeout, file: file, line: line)
+        return run(arguments: arguments, configure: configure, timeout: timeout, file: (file), line: line)
     }
     
     @discardableResult
