@@ -163,20 +163,20 @@ public class Icebox<Config: IceboxConfig> {
     @discardableResult
     public func runSuccess(_ arguments: String..., configure: ProcessConfiguration? = nil, timeout: Int? = nil, file: StaticString = #file, line: UInt = #line) -> RunResult {
         let result = run(arguments: arguments, configure: configure, timeout: timeout, file: file, line: line)
-        XCTAssertEqual(result.exitStatus, 0, file: (file), line: line)
+        XCTAssertEqual(result.exitStatus, 0)
         return result
     }
     
     @discardableResult
     public func runFailure(_ arguments: String..., configure: ProcessConfiguration? = nil, timeout: Int? = nil, file: StaticString = #file, line: UInt = #line, expectedExitStatus: Int32) -> RunResult {
-        let result = run(arguments: arguments, configure: configure, timeout: timeout, file: (file), line: line)
-        XCTAssertEqual(result.exitStatus, expectedExitStatus, file: (file), line: line)
+        let result = run(arguments: arguments, configure: configure, timeout: timeout, file: file, line: line)
+        XCTAssertEqual(result.exitStatus, expectedExitStatus)
         return result
     }
     
     @discardableResult
     public func run(_ arguments: String..., configure: ProcessConfiguration? = nil, timeout: Int? = nil, file: StaticString = #file, line: UInt = #line) -> RunResult {
-        return run(arguments: arguments, configure: configure, timeout: timeout, file: (file), line: line)
+        return run(arguments: arguments, configure: configure, timeout: timeout)
     }
     
     @discardableResult
