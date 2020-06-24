@@ -42,7 +42,7 @@ public class Icebox<Config: IceboxConfig> {
     private let boxPath: Path
     private var currentProcess: Process?
     
-    public init(template: Config.Templates?, file: StaticString = #file, function: StaticString = #function) {
+    public init(template: Config.Templates?, file: StaticString! = #file, function: StaticString = #function) {
         let fileComps = Path(file.description).components
         
         let sourceFolder: Path
@@ -180,7 +180,7 @@ public class Icebox<Config: IceboxConfig> {
     }
     
     @discardableResult
-    public func run(arguments: [String], configure: ProcessConfiguration? = nil, timeout: Int? = nil, file: StaticString = #file, line: UInt = #line) -> RunResult {
+    public func run(arguments: [String], configure: ProcessConfiguration? = nil, timeout: Int? = nil, file: StaticString! = #file, line: UInt = #line) -> RunResult {
         let out = Pipe()
         let err = Pipe()
         
